@@ -1,2 +1,8 @@
-# Ignore the build directory
+# Ignore directories
 build/
+devel/commonlisp/
+devel/gennodejs/
+devel/roseus/
+
+# Ignore pyc files
+*.pyc
