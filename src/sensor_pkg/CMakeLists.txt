@@ -53,7 +53,7 @@ find_package(catkin REQUIRED COMPONENTS
    FILES
    lone_sensor.msg
    AllSensors.msg
-   user_command.msg
+   sensor_user_command.msg
  )
 
 ## Generate services in the 'srv' folder
@@ -164,10 +164,10 @@ include_directories(
 ## in contrast to setup.py, you can choose the destination
 catkin_install_python(PROGRAMS
    script/read_publish_sensor_node.py
-   user_example/user_sample_1_read_values.py
-   user_example/user_sample_2_abs_pitch_yaw.py
-   user_example/user_sample_3_setfreq_calibrate.py
-   user_example/user_sample_4_diagnosis_request.py
+   user_example/sensor_user_sample_1_read_values.py
+   user_example/sensor_user_sample_2_abs_pitch_yaw.py
+   user_example/sensor_user_sample_3_setfreq_calibrate.py
+   user_example/sensor_user_sample_4_diagnosis_request.py
    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

@@ -38,17 +38,17 @@ except serial.SerialException:
     rospy.logerr("Could not open serial port %s", port)
     quit()
 
-# Initializing the Ros listener callback to read user_command and write back for the sensors
-def user_command_callback(user_command):
+# Initializing the Ros listener callback to read sensor_user_command and write back for the sensors
+def sensor_user_command_callback(sensor_user_command):
                                                             # If user sets calibrate to True
-    if user_command.calibrate == True:
+    if sensor_user_command.calibrate == True:
         sensor_read.write('calibrate\r\n'.encode('ascii'))  # Then send the calibrate command to the sensor
         rospy.loginfo("Sensors calibrated")
 
-    if user_command.setepoch == True:                       # If the user sets 'setepoch' field to true
+    if sensor_user_command.setepoch == True:                       # If the user sets 'setepoch' field to true
     # Retrieving timestamp values from the command
-        secs = user_command.epoch_sec
-        msecs = user_command.epoch_msec
+        secs = sensor_user_command.epoch_sec
+        msecs = sensor_user_command.epoch_msec
     # Concatenate seconds and milliseconds into a string
         timestamp = secs + ',' + msecs
         set_epoch_command = 'setepoch,'+ secs + ',' + msecs + '\r\n'
@@ -58,7 +58,7 @@ def user_command_callback(user_command):
         rospy.loginfo("Command sent to sent epoch to %s" % timestamp)
         time.sleep(0.1)
 
-    if user_command.diagnosis_request == True:              # If the user requests for a diagnosis
+    if sensor_user_command.diagnosis_request == True:              # If the user requests for a diagnosis
         # Send the dumpsensors command to get informations
         sensor_read.write('dumpsensors\r\n'.encode('ascii'))
         time.sleep(0.1)
@@ -74,28 +74,29 @@ def user_command_callback(user_command):
         # Send the resume command to get the sensors go back to their usual job
         sensor_read.write('resume\r\n'.encode('ascii'))
 
-    if user_command.set_frequency == True:
-        period_ms = (1 / user_command.frequency) * 1000          # User sets frequency, converting to ms to send the message to the sensors
+    if sensor_user_command.set_frequency == True:
+        period_ms = (1 / sensor_user_command.frequency) * 1000          # User sets frequency, converting to ms to send the message to the sensors
         print("requested period is :" + str(period_ms))
         set_freq_str = "setperiod," + str(period_ms)
         sensor_read.write(set_freq_str.encode('ascii'))
         # Check if the requested frequency can be handled by the sensors
         if period_ms >= 20:
-            rospy.loginfo("Sensor frequency set to %s" % str(user_command.frequency))
+            rospy.loginfo("Sensor frequency set to %s" % str(sensor_user_command.frequency))
         else:
             rospy.loginfo("Tried to change frequency above the limit. Try again with a value between 1 and 50")
         time.sleep(0.1)
 
-    if user_command.raw_string == True:         # If the user wants to send a custom command
-        raw = user_command.raw                  # Read the command
+    if sensor_user_command.raw_string == True:         # If the user wants to send a custom command
+        raw = sensor_user_command.raw                  # Read the command
         sensor_read.write(raw.encode('ascii'))  # Send it to the sensors
-        rospy.loginfo("Command %s sent" % user_command.raw)
+        rospy.loginfo("Command %s sent" % sensor_user_command.raw)
+        print("raw data sent")
         time.sleep(0.1)
 
 # Initializing the Ros publisher Node for sensor data
 pub = rospy.Publisher('AllSensors', AllSensors, queue_size = 10)    #Type of message to be sent : AllSensors
 rospy.init_node('seed_fts3', anonymous=True)                        # Initialize a node named seed_fts3
-rospy.Subscriber('user_command', user_command, user_command_callback)
+rospy.Subscriber('sensor_user_command', sensor_user_command, sensor_user_command_callback)
 r = rospy.Rate(50)                                                  # 50Hz
 
 
@@ -123,8 +124,8 @@ def cart2sph(x, y, z):
     az = np.arctan2(y, x)
     return r, el, az
 
-#Initializing a list of sensors
-sensors = [Sensor() for i in range(SENSOR_NUMBER)]
+#Initializing a list of 5 sensor objects
+sensors = [Sensor() for i in range(5)]
 
 
 # Calibrate sensors
@@ -151,32 +152,32 @@ def parse_data_into_obj(data):
     if data[0] == '@':
         #Defining timestamp with the 2 first data : time (s) and time (ms)
         timestamp = data[1] + "," + data[2]
-        for i in range(SENSOR_NUMBER):
+        for i, sensor in enumerate(sensors):
             if (data[5 + 3 * i] == ''):                                                         # If Fx or Fy field is empty on the data stream
-                sensors[i].id = i                                                               # Then put all fields to 0
-                sensors[i].fx = 0
-                sensors[i].fy = 0
-                sensors[i].fz = 0
-                sensors[i].is_present = False                                                   # And warn that there is a sensor missing
+                sensor.id = i                                                               # Then put all fields to 0
+                sensor.fx = 0
+                sensor.fy = 0
+                sensor.fz = 0
+                sensor.is_present = False                                                   # And warn that there is a sensor missing
             elif (data[5 + 3 * i] != '' and (data[3 + 3 * i] == '' or data[4 + 3 * i] == '')):  # If only the fz field is filled
-                sensors[i].id = i
-                sensors[i].fx = 0
-                sensors[i].fy = 0
-                sensors[i].fz = fz
-                sensors[i].is_3D = False                                                        # Then it's not a 3D sensor but a 1D sensor
+                sensor.id = i
+                sensor.fx = 0
+                sensor.fy = 0
+                sensor.fz = fz
+                sensor.is_3D = False                                                        # Then it's not a 3D sensor but a 1D sensor
             else:                                                                               # Usual case : this is a 3D sensor
             # Fill all the attributes
                 fx = int(data[3 + 3 * i])
                 fy = int(data[4 + 3 * i])
                 fz = int(data[5 + 3 * i])
-                sensors[i].id = i
-                sensors[i].fx = fx
-                sensors[i].fy = fy
-                sensors[i].fz = fz
+                sensor.id = i
+                sensor.fx = fx
+                sensor.fy = fy
+                sensor.fz = fz
                 r, theta, phi = cart2sph(fx, fy, fz)    # Convert cartesian coordinates to polar coordinates
-                sensors[i].abs = r                      # Fill in the polar coordinates attributes
-                sensors[i].pitch = phi
-                sensors[i].yaw = theta
+                sensor.abs = r                      # Fill in the polar coordinates attributes
+                sensor.pitch = phi
+                sensor.yaw = theta
         return timestamp
     elif data[0] == '#OK':          # If the line starts with a #OK, then it's a response to a command
         message = ""
@@ -205,20 +206,8 @@ def parse_data(serial_sensor):
         line_str = line.decode("utf-8")
         #Split the line into a str list
         data = line_str.split(",")
-        #Check if all the sensors are sending data
-        if len(data) == SUPPOSED_ARRAY_LENGTH:
-            #Call to the function that put the str list into Sensor objects attributes
-            timestamp = parse_data_into_obj(data)
-            #timestamp = parse_data_into_obj(fake_data)
-        else:
-            #Throw warning
-            print("Weird length")
-            rospy.logwarn("Weird length")
-            #Filter the list : finding empty elements and removing them
-            #new_list = list(filter(lambda x: (x != ""),data))
-            #print(new_list)
-            #Call to the function that put the str list into Sensor objects attributes
-            timestamp = parse_data_into_obj(data)
+        #Call to the function that put the str list into Sensor objects attributes
+        timestamp = parse_data_into_obj(data)
     else:
         return None
     return timestamp
@@ -226,23 +215,26 @@ def parse_data(serial_sensor):
 # Main loop
 while not rospy.is_shutdown():
     timestamp = parse_data(sensor_read)     # Parses the serial data into the list of Sensor objects
+    # Filter the sensors list to remove sensors with is_present flag False
+    filtered_sensors = [sensor for sensor in sensors if sensor.is_present == True]
     # Loop that goes through the list of Sensor objects
     # Then fills each messages of the lone_sensor_msgs list with the Sensor objects' attributes
-    for i in range(SENSOR_NUMBER):
-        lone_sensor_msgs[i].id = sensors[i].id
-        lone_sensor_msgs[i].fx = sensors[i].fx
-        lone_sensor_msgs[i].fy = sensors[i].fy
-        lone_sensor_msgs[i].fz = sensors[i].fz
-        lone_sensor_msgs[i].abs = sensors[i].abs
-        lone_sensor_msgs[i].yaw = sensors[i].yaw
-        lone_sensor_msgs[i].pitch = sensors[i].pitch
-        lone_sensor_msgs[i].is_present = sensors[i].is_present
+    for message,sensor in zip(lone_sensor_msgs,filtered_sensors):
+        message.id = sensor.id
+        message.fx = sensor.fx
+        message.fy = sensor.fy
+        message.fz = sensor.fz
+        message.abs = sensor.abs
+        message.yaw = sensor.yaw
+        message.pitch = sensor.pitch
+        message.is_present = sensor.is_present
     # Fill in the AllSensors message
     final_msg.length = SENSOR_NUMBER            # Fill the length
     final_msg.header.stamp = rospy.Time.now()   # Get the timestamp
     final_msg.data = lone_sensor_msgs           # Fill the data list with the lone_sensor_msgs list
     # Publish the AllSensors message
     pub.publish(final_msg)
+    rospy.loginfo(final_msg)
     try:
         r.sleep()       # Sleep for 20ms (highest frequency of the sensors)
     except rospy.ROSInterruptException:
