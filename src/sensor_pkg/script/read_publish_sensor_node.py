@@ -234,7 +234,7 @@ while not rospy.is_shutdown():
     final_msg.data = lone_sensor_msgs           # Fill the data list with the lone_sensor_msgs list
     # Publish the AllSensors message
     pub.publish(final_msg)
-    rospy.loginfo(final_msg)
+    #rospy.loginfo(final_msg)
     try:
         r.sleep()       # Sleep for 20ms (highest frequency of the sensors)
     except rospy.ROSInterruptException:
